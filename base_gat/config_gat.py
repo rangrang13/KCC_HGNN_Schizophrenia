@@ -1,7 +1,6 @@
 # config_gat.py
 
 import os
-import torch
 from pathlib import Path
 
 # 데이터 경로
