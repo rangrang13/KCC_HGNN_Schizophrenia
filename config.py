@@ -1,6 +1,7 @@
 # config.py
 
 import os
+from pathlib import Path
 
 # 데이터 경로
 PROJECT_DIR = Path(__file__).resolve().parent.parent
