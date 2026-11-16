@@ -47,12 +47,14 @@ from utils_gat import (
     print_fold_summary,
 )
 
+
+# 학습 안정화 설정
 GRAD_CLIP_NORM = 1.0
 LR_SCHEDULER_FACTOR = 0.5
 LR_SCHEDULER_PATIENCE = 5
 LR_SCHEDULER_MIN_LR = 1e-4
 
-
+# 클래스 가중치 계산
 def get_train_class_weights(dataset, train_idx, device):
     all_labels = dataset.get_labels()
     train_labels = [all_labels[i] for i in train_idx]
@@ -62,7 +64,7 @@ def get_train_class_weights(dataset, train_idx, device):
     class_weights = total / (2.0 * class_counts)
     return torch.tensor(class_weights, dtype=torch.float32, device=device)
 
-
+# 에포크별 모델 학습
 def train_one_epoch(model, loader, criterion, optimizer, device, grad_accum_steps=1):
     model.train()
     loss_meter = AverageMeter()
@@ -95,7 +97,7 @@ def train_one_epoch(model, loader, criterion, optimizer, device, grad_accum_step
     )
     return loss_meter.avg, metrics
 
-
+# 검증 데이터 평가
 @torch.no_grad()
 def evaluate(model, loader, criterion, device):
     model.eval()
@@ -119,7 +121,7 @@ def evaluate(model, loader, criterion, device):
     )
     return loss_meter.avg, metrics
 
-
+# 피험자별 예측 확률 수집
 @torch.no_grad()
 def collect_probs(model, dataset, indices, device=DEVICE):
     model.eval()
@@ -134,7 +136,7 @@ def collect_probs(model, dataset, indices, device=DEVICE):
         y_prob_all.append(probs[:, 1].item())
     return np.array(y_true_all), np.array(y_prob_all)
 
-
+# 데이터 로더 구성
 def build_dataloaders(dataset, train_idx, val_idx):
     train_subset = Subset(dataset, train_idx)
     val_subset = Subset(dataset, val_idx)
@@ -154,16 +156,18 @@ def build_dataloaders(dataset, train_idx, val_idx):
     )
     return train_loader, val_loader
 
-
+# 폴드별 학습 및 평가
 def run_fold(fold, dataset, train_idx, val_idx):
     print(f"\nStart Fold {fold}")
     train_loader, val_loader = build_dataloaders(
         dataset, train_idx, val_idx
     )
+    # 모델 및 옵티마이저
     model = SubjectGATClassifier().to(DEVICE)
     class_weights = get_train_class_weights(dataset, train_idx, DEVICE)
     criterion = nn.CrossEntropyLoss(weight=class_weights)
     optimizer = Adam(model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
+    # 학습률 스케줄러
     scheduler = ReduceLROnPlateau(
         optimizer,
         mode="min",
@@ -171,6 +175,7 @@ def run_fold(fold, dataset, train_idx, val_idx):
         patience=LR_SCHEDULER_PATIENCE,
         min_lr=LR_SCHEDULER_MIN_LR,
     )
+    # 조기 종료
     early_stopper = (
         EarlyStopping(patience=PATIENCE, mode="min")
         if USE_EARLY_STOPPING else None
@@ -179,7 +184,7 @@ def run_fold(fold, dataset, train_idx, val_idx):
     best_ckpt_path = os.path.join(
         CHECKPOINT_DIR, f"best_gat_fold_{fold}.pt"
     )
-
+    # 모델 학습
     for epoch in range(1, EPOCHS + 1):
         train_loss, train_metrics = train_one_epoch(
             model=model,
@@ -205,6 +210,7 @@ def run_fold(fold, dataset, train_idx, val_idx):
             val_metrics=val_metrics,
             lr=current_lr,
         )
+        # 최적 모델 저장
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             if SAVE_BEST_MODEL:
@@ -228,6 +234,7 @@ def run_fold(fold, dataset, train_idx, val_idx):
             if early_stopper.step(val_loss):
                 print(f"[Fold {fold}] Early stopping at epoch {epoch}")
                 break
+    # 최적 모델 불러오기
     if SAVE_BEST_MODEL and os.path.exists(best_ckpt_path):
         load_checkpoint(
             best_ckpt_path,
@@ -241,6 +248,7 @@ def run_fold(fold, dataset, train_idx, val_idx):
         criterion=criterion,
         device=DEVICE,
     )
+    # 임계값 탐색
     if USE_THRESHOLD_TUNING:
         y_true_train, y_prob_train = collect_probs(
             model, dataset, train_idx, device=DEVICE
@@ -256,6 +264,7 @@ def run_fold(fold, dataset, train_idx, val_idx):
         )
     else:
         best_thr = BASE_THRESHOLD
+    # 최종 검증 성능
     y_true_val, y_prob_val = collect_probs(
         model, dataset, val_idx, device=DEVICE
     )
@@ -273,6 +282,7 @@ def run_fold(fold, dataset, train_idx, val_idx):
     return final_val_metrics
 
 
+# 교차검증 결과 요약
 def summarize_cross_validation_results(fold_results):
     metric_names = [
         "accuracy",
@@ -292,6 +302,7 @@ def summarize_cross_validation_results(fold_results):
     print("=" * 60)
 
 
+# 전체 학습 실행
 def main():
     set_seed(SEED)
     print("Train GAT for Subject-level Graph Classification")
@@ -301,6 +312,7 @@ def main():
     print(f"Total usable subjects: {len(dataset)}")
     if len(dataset) == 0:
         raise ValueError("Dataset is empty.")
+    # Stratified K-fold 교차검증
     skf = StratifiedKFold(
         n_splits=NUM_FOLDS,
         shuffle=True,
@@ -318,5 +330,6 @@ def main():
         )
         fold_results.append(fold_metrics)
     summarize_cross_validation_results(fold_results)
+
 if __name__ == "__main__":
     main()
