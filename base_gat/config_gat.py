@@ -26,28 +26,12 @@ TIME_LENGTH = 150
 EXPECTED_TIME_SHAPE = (150, 200)
 EXPECTED_CORR_SHAPE = (200, 200)
 
-# 노드 특징 (corr_row / raw_time / summary)
+# 노드 특징 
 NODE_FEATURE_MODE = "corr_row"
-
-# 요약 특징 (평균 / 표준편차)
-SUMMARY_USE_MEAN = True
-SUMMARY_USE_STD = True
 
 # 상관관계 특징 설정
 CORR_ROW_USE_ABS = False
 CORR_ROW_ZERO_DIAG = True
-
-# 노드 특징별 입력 차원
-def get_input_dim() -> int:
-    if NODE_FEATURE_MODE == "corr_row":
-        return NUM_ROIS
-    if NODE_FEATURE_MODE == "raw_time":
-        return TIME_LENGTH
-    if NODE_FEATURE_MODE == "summary":
-        dim = int(SUMMARY_USE_MEAN) + int(SUMMARY_USE_STD)
-        return dim
-    raise ValueError(f"지원하지 않는 노드 특징 모드 : {NODE_FEATURE_MODE}")
-
 
 INPUT_DIM = NUM_ROIS
 
