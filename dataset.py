@@ -24,6 +24,7 @@ from config import (
 )
 
 
+# 피험자 파일 수집
 def collect_subject_files() -> List[Dict[str, Any]]:
     samples = []
     for group_name, group_dir in [("Control", CONTROL_DIR), ("Patient", PATIENT_DIR)]:
@@ -37,11 +38,15 @@ def collect_subject_files() -> List[Dict[str, Any]]:
             })
     return samples
 
+
+# 상관행렬 대칭화
 def symmetrize_corr(corr: np.ndarray) -> np.ndarray:
     corr = 0.5 * (corr + corr.T)
     np.fill_diagonal(corr, 1.0)
     return corr.astype(np.float32)
 
+
+# 중복 하이퍼엣지 제거
 def unique_hyperedges(hyperedges: List[List[int]]) -> List[List[int]]:
     seen = set()
     unique_edges = []
@@ -54,6 +59,8 @@ def unique_hyperedges(hyperedges: List[List[int]]) -> List[List[int]]:
             unique_edges.append(list(edge_sorted))
     return unique_edges
 
+
+# 하이퍼엣지 개수 제한
 def limit_num_hyperedges(hyperedges: List[List[int]], max_edges: Optional[int]) -> List[List[int]]:
     if max_edges is None:
         return hyperedges
@@ -61,6 +68,8 @@ def limit_num_hyperedges(hyperedges: List[List[int]], max_edges: Optional[int]) 
         raise ValueError("NUM_HYPEREDGES_PER_SUBJECT는 양수여야 한다.")
     return hyperedges[:max_edges]
 
+
+# KNN 기반 하이퍼엣지 구성
 def build_hyperedges_from_corr(
     corr: np.ndarray,
     k_neighbors: int = K_NEIGHBORS,
@@ -71,47 +80,63 @@ def build_hyperedges_from_corr(
     num_rois = corr.shape[0]
     hyperedges = []
     score_matrix = np.abs(corr) if use_abs_corr else corr.copy()
+
     for anchor in range(num_rois):
         scores = score_matrix[anchor].copy()
         scores[anchor] = -np.inf
         topk_indices = np.argsort(scores)[-k_neighbors:]
         topk_indices = topk_indices[np.argsort(scores[topk_indices])[::-1]]
+
         if include_self:
             hyperedge = [anchor] + topk_indices.tolist()
         else:
             hyperedge = topk_indices.tolist()
+
         hyperedges.append(hyperedge)
+
     hyperedges = unique_hyperedges(hyperedges)
     hyperedges = limit_num_hyperedges(hyperedges, max_edges)
     return hyperedges
 
+
+# 행별 Z-score 정규화
 def rowwise_zscore(x: np.ndarray, eps: float = 1e-8) -> np.ndarray:
     row_mean = x.mean(axis=1, keepdims=True)
     row_std = x.std(axis=1, keepdims=True)
     row_std = np.where(row_std < eps, 1.0, row_std)
     return (x - row_mean) / row_std
 
+
+# Corr-row 노드 특징 생성
 def build_corr_row_node_features(corr_data: np.ndarray) -> np.ndarray:
     x = corr_data.copy()
+
     if CORR_ROW_USE_ABS:
         x = np.abs(x)
+
     if CORR_ROW_ZERO_DIAG:
         np.fill_diagonal(x, 0.0)
+
     x = rowwise_zscore(x)
+
     if CORR_ROW_ZERO_DIAG:
         np.fill_diagonal(x, 0.0)
+
     return x.astype(np.float32)
 
 
+# 피험자별 하이퍼그래프 생성
 def load_single_subject(file_path: Path, folder_group_name: str) -> Dict[str, Any]:
     with np.load(file_path, allow_pickle=False) as data:
         corr_data = data["corr"]
+
     corr_data = symmetrize_corr(corr_data)
     group_name = folder_group_name
     x = build_corr_row_node_features(corr_data)
     hyperedges = build_hyperedges_from_corr(corr_data)
     hg = Hypergraph(NUM_ROIS, hyperedges)
     y = LABEL_MAP[group_name]
+
     sample = {
         "x": torch.tensor(x, dtype=torch.float32),
         "hg": hg,
@@ -124,6 +149,7 @@ def load_single_subject(file_path: Path, folder_group_name: str) -> Dict[str, An
     return sample
 
 
+# COBRE 데이터셋
 class COBREHypergraphDataset(Dataset):
     def __init__(self, cache_in_memory: bool = True):
         super().__init__()
@@ -137,12 +163,15 @@ class COBREHypergraphDataset(Dataset):
     def __getitem__(self, idx: int) -> Dict[str, Any]:
         if self.cache_in_memory and idx in self._cache:
             return self._cache[idx]
+
         item_info = self.samples[idx]
         file_path = item_info["file_path"]
         group_name = item_info["group_name"]
         sample = load_single_subject(file_path, group_name)
+
         if self.cache_in_memory:
             self._cache[idx] = sample
+
         return sample
 
     def get_labels(self) -> List[int]:
@@ -152,6 +181,8 @@ class COBREHypergraphDataset(Dataset):
             labels.append(LABEL_MAP[group_name])
         return labels
 
+
+# 배치 처리
 def simple_collate_fn(batch: List[Dict[str, Any]]) -> Dict[str, Any]:
     if len(batch) != 1:
         raise ValueError("Batch size는 1이어야 한다.")
