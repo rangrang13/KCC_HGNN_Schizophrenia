@@ -15,19 +15,20 @@ from config_ml import (
 )
 
 
+# 상관행렬 대칭화
 def symmetrize_corr(corr: np.ndarray) -> np.ndarray:
     corr = 0.5 * (corr + corr.T)
     np.fill_diagonal(corr, 1.0)
     return corr.astype(np.float32)
 
-
+# 행별 Z-score 정규화
 def rowwise_zscore(x: np.ndarray, eps: float = 1e-8) -> np.ndarray:
     row_mean = x.mean(axis=1, keepdims=True)
     row_std = x.std(axis=1, keepdims=True)
     row_std = np.where(row_std < eps, 1.0, row_std)
     return (x - row_mean) / row_std
 
-
+# 상관관계 특징 전처리
 def preprocess_corr_row(corr: np.ndarray) -> np.ndarray:
     x = corr.copy()
     if CORR_ROW_USE_ABS:
@@ -40,13 +41,13 @@ def preprocess_corr_row(corr: np.ndarray) -> np.ndarray:
         np.fill_diagonal(x, 0.0)
     return x.astype(np.float32)
 
-
+# SVM 입력 특징 생성
 def make_feature_from_corr(corr: np.ndarray) -> np.ndarray:
     corr = symmetrize_corr(corr)
     x = preprocess_corr_row(corr)
     return x.reshape(-1).astype(np.float32)
 
-
+# COBRE 데이터셋 불러오기
 def load_dataset():
     X = []
     y = []
