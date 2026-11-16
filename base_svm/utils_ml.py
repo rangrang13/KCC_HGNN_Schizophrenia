@@ -13,11 +13,12 @@ from sklearn.metrics import (
 )
 
 
+# 랜덤 시드 고정
 def set_seed(seed: int = 42):
     random.seed(seed)
     np.random.seed(seed)
 
-
+# AUC 계산
 def safe_auc_score(y_true, y_prob):
     if len(np.unique(y_true)) < 2:
         return np.nan
@@ -26,7 +27,7 @@ def safe_auc_score(y_true, y_prob):
     except ValueError:
         return np.nan
 
-
+# 분류 성능 평가
 def compute_classification_metrics(y_true, y_pred, y_prob=None):
     y_true = np.asarray(y_true)
     y_pred = np.asarray(y_pred)
@@ -55,7 +56,7 @@ def compute_classification_metrics(y_true, y_pred, y_prob=None):
     )
     return metrics
 
-
+# 임계값 기반 성능 계산
 def compute_metrics(y_true, y_prob, threshold=0.5):
     y_true = np.asarray(y_true)
     y_prob = np.asarray(y_prob)
@@ -64,7 +65,7 @@ def compute_metrics(y_true, y_prob, threshold=0.5):
     metrics["threshold"] = float(threshold)
     return metrics
 
-
+# Recall 제약 기반 임계값 탐색
 def find_best_threshold_under_recall_constraint(
     y_true,
     y_prob,
@@ -115,7 +116,7 @@ def find_best_threshold_under_recall_constraint(
             best_metrics = candidate_metrics
     return float(best_thr), best_metrics, baseline_metrics
 
-
+# 폴드별 최종 결과
 def print_fold_summary(fold, metrics):
     print(
         f"[Fold {fold}] "
@@ -126,7 +127,7 @@ def print_fold_summary(fold, metrics):
         f"SPEC: {metrics['specificity']:.4f}"
     )
 
-
+# 교차검증 결과 요약
 def print_cv_summary(title, fold_results):
     metric_names = [
         "accuracy",
