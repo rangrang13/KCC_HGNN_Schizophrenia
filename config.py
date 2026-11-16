@@ -1,10 +1,13 @@
 # config.py
 
 import os
+from pathlib import Path
 
-DATA_DIR = "/Users/eunhye/PyCharmMiscProject/data/COBRE_SCZ/reorder_preprocessed/total_preprocessed_result/cpac_based/NoGSR/cc200"
-CONTROL_DIR = os.path.join(DATA_DIR, "Control")
-PATIENT_DIR = os.path.join(DATA_DIR, "Patient")
+# 데이터 경로
+PROJECT_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = Path(os.environ.get("COBRE_DATA_DIR", str(PROJECT_DIR / "data")))
+CONTROL_DIR = DATA_DIR / "Control"
+PATIENT_DIR = DATA_DIR / "Patient"
 
 # 제외할 파일
 EXCLUDE_FILES = ["40075.npz"]
