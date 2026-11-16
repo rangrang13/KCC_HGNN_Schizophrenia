@@ -32,6 +32,7 @@ from utils_ml import (
 )
 
 
+# SVM 모델 구성
 def build_svm_pipeline():
     steps = []
     if SVM_USE_STANDARD_SCALER:
@@ -50,14 +51,17 @@ def build_svm_pipeline():
     return Pipeline(steps)
 
 
+# 폴드별 학습 및 평가
 def run_fold(fold, X, y, train_idx, val_idx):
     X_train = X[train_idx]
     y_train = y[train_idx]
     X_val = X[val_idx]
     y_val = y[val_idx]
+    # 모델 학습
     model = build_svm_pipeline()
     model.fit(X_train, y_train)
     y_prob_val = model.predict_proba(X_val)[:, 1]
+    # 임계값 탐색
     if USE_THRESHOLD_TUNING:
         y_prob_train = model.predict_proba(X_train)[:, 1]
         best_thr, _, _ = find_best_threshold_under_recall_constraint(
@@ -71,6 +75,7 @@ def run_fold(fold, X, y, train_idx, val_idx):
         )
     else:
         best_thr = BASE_THRESHOLD
+    # 최종 검증 성능
     final_val_metrics = compute_metrics(
         y_true=y_val,
         y_prob=y_prob_val,
@@ -80,9 +85,11 @@ def run_fold(fold, X, y, train_idx, val_idx):
     return final_val_metrics
 
 
+# 전체 학습 실행
 def main():
     set_seed(SEED)
     X, y, _ = load_dataset()
+    # Stratified K-fold 교차검증
     skf = StratifiedKFold(
         n_splits=NUM_FOLDS,
         shuffle=True,
@@ -100,6 +107,7 @@ def main():
             val_idx=val_idx,
         )
         fold_results.append(fold_metrics)
+    # 교차검증 결과 요약
     print_cv_summary(
         "SVM Cross-Validation Final Summary",
         fold_results,
