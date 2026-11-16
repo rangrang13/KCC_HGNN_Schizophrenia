@@ -19,6 +19,7 @@ from config_gat import (
 )
 
 
+# GAT 합성곱 블록
 class GATConvBlock(nn.Module):
     def __init__(self, in_dim: int, out_dim: int, dropout: float = 0.0):
         super().__init__()
@@ -35,6 +36,7 @@ class GATConvBlock(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.reset_parameters()
 
+    # 가중치 초기화
     def reset_parameters(self):
         self.conv.reset_parameters()
 
@@ -45,6 +47,7 @@ class GATConvBlock(nn.Module):
         return x
 
 
+# 피험자 단위 GAT 분류 모델
 class SubjectGATClassifier(nn.Module):
     def __init__(
         self,
@@ -54,8 +57,10 @@ class SubjectGATClassifier(nn.Module):
         dropout: float = DROPOUT,
     ):
         super().__init__()
+        # 입력 특징 변환
         self.input_proj = nn.Linear(input_dim, hidden_dim)
         self.input_dropout = nn.Dropout(dropout)
+        # GAT 레이어
         self.convs = nn.ModuleList()
         for _ in range(NUM_LAYERS):
             self.convs.append(
@@ -65,10 +70,12 @@ class SubjectGATClassifier(nn.Module):
                     dropout=dropout,
                 )
             )
+        # 최종 분류기
         self.pre_classifier_dropout = nn.Dropout(dropout)
         self.classifier = nn.Linear(hidden_dim, num_classes)
         self.reset_parameters()
 
+    # 가중치 초기화
     def reset_parameters(self):
         nn.init.xavier_uniform_(self.input_proj.weight)
         if self.input_proj.bias is not None:
@@ -82,13 +89,17 @@ class SubjectGATClassifier(nn.Module):
     def forward(self, data):
         x = data.x
         edge_index = data.edge_index
+        # 입력 특징 변환
         x = self.input_proj(x)
         x = F.elu(x)
         x = self.input_dropout(x)
+        # 그래프 어텐션 연산
         for conv in self.convs:
             x = conv(x, edge_index)
+        # 노드 임베딩 및 평균 풀링
         node_emb = x
         subject_emb = node_emb.mean(dim=0, keepdim=True)
+        # 질병 분류
         subject_emb = self.pre_classifier_dropout(subject_emb)
         logits = self.classifier(subject_emb)
         return logits, subject_emb, node_emb
