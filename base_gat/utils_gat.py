@@ -15,6 +15,7 @@ from sklearn.metrics import (
 )
 
 
+# 랜덤 시드 고정
 def set_seed(seed: int = 42) -> None:
     random.seed(seed)
     np.random.seed(seed)
@@ -25,7 +26,7 @@ def set_seed(seed: int = 42) -> None:
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-
+# 평균값 계산
 class AverageMeter:
     def __init__(self):
         self.reset()
@@ -42,7 +43,7 @@ class AverageMeter:
         self.count += n
         self.avg = self.sum / self.count if self.count != 0 else 0.0
 
-
+# AUC 계산
 def safe_auc_score(y_true: np.ndarray, y_prob: np.ndarray) -> float:
     if len(np.unique(y_true)) < 2:
         return np.nan
@@ -51,7 +52,7 @@ def safe_auc_score(y_true: np.ndarray, y_prob: np.ndarray) -> float:
     except ValueError:
         return np.nan
 
-
+# 분류 성능 평가
 def compute_classification_metrics(
     y_true,
     y_pred,
@@ -78,7 +79,7 @@ def compute_classification_metrics(
         metrics["auc"] = np.nan
     return metrics
 
-
+# 임계값 기반 성능 계산
 def compute_metrics(
     y_true,
     y_prob,
@@ -91,7 +92,7 @@ def compute_metrics(
     metrics["threshold"] = float(threshold)
     return metrics
 
-
+# Recall 제약 기반 임계값 탐색
 def find_best_threshold_under_recall_constraint(
     y_true,
     y_prob,
@@ -140,7 +141,7 @@ def find_best_threshold_under_recall_constraint(
             best_metrics = candidate_metrics
     return float(best_thr), best_metrics, baseline_metrics
 
-
+# 체크포인트 저장
 def save_checkpoint(
     save_path: str,
     model: torch.nn.Module,
@@ -162,6 +163,7 @@ def save_checkpoint(
         checkpoint["extra"] = extra
     torch.save(checkpoint, save_path)
 
+# 체크포인트 불러오기
 def load_checkpoint(
     load_path: str,
     model: torch.nn.Module,
@@ -178,7 +180,7 @@ def load_checkpoint(
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
     return checkpoint
 
-
+# 조기 종료
 class EarlyStopping:
     def __init__(self, patience: int = 10, mode: str = "max", min_delta: float = 0.0):
         if mode not in {"max", "min"}:
@@ -208,7 +210,7 @@ class EarlyStopping:
             self.should_stop = True
         return self.should_stop
 
-
+# 평가 지표 출력 형식
 def format_metric_value(value: float) -> str:
     if value is None:
         return "None"
@@ -216,7 +218,7 @@ def format_metric_value(value: float) -> str:
         return "nan"
     return f"{value:.4f}"
 
-
+# 에포크별 학습 결과
 def print_epoch_log(
     fold: int,
     epoch: int,
@@ -240,7 +242,7 @@ def print_epoch_log(
         log_str += f" | LR: {lr:.6e}"
     print(log_str)
 
-
+# 폴드별 최종 결과
 def print_fold_summary(
     fold: int,
     metrics: Dict[str, float],
